@@ -10,33 +10,26 @@ on:
 
 jobs:
   build:
+    name: Build Python Wheel
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Check structure
-        run: |
-          pwd
-          ls -la
-          ls -la video_transcoders
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install build tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install build scikit-build-core pybind11
-
-      - name: Install FFmpeg
+      - name: Install system dependencies
         run: |
           sudo apt update
           sudo apt install -y \
+            cmake \
+            ninja-build \
             pkg-config \
+            ffmpeg \
             libavformat-dev \
             libavcodec-dev \
             libavfilter-dev \
@@ -44,13 +37,23 @@ jobs:
             libswresample-dev \
             libavutil-dev
 
-      - name: Build package
+      - name: Install Python build tools
         run: |
-          cd video_transcoders
+          python -m pip install --upgrade pip
+          pip install build scikit-build-core pybind11
+
+      - name: Check project files
+        run: |
+          pwd
+          ls -la
+          ls -la src
+
+      - name: Build wheel
+        run: |
           python -m build
 
-      - name: Upload wheel
+      - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: video-transcoders-wheel
-          path: video_transcoders/dist/*
+          name: python-wheel
+          path: dist/*
