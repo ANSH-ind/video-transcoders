@@ -1,0 +1,28 @@
+[build-system]
+requires = [
+    "scikit-build-core",
+    "pybind11"
+]
+build-backend = "scikit_build_core.build"
+
+
+[project]
+name = "video-transcoders"
+version = "0.1.0"
+description = "High performance FFmpeg HLS encoder with C++ and pybind11"
+readme = "README.md"
+requires-python = ">=3.10"
+
+authors = [
+    {name = "Ansh Raj", email = "anshraj0000000001@gmail.com"}
+]
+
+
+[project.urls]
+Documentation = "https://anshstudios.pages.dev/video_transcoders"
+Portfolio = "https://anshstudios.pages.dev/portfolio"
+
+
+[tool.scikit-build]
+wheel.packages = []
+build.verbose = true

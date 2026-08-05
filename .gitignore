@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled
+*.so
+*.dll
+*.dylib
+*.o
+
+# Keys
+*.key
+*.keyinfo
+
+# IDE
+.vscode/
+.idea/
