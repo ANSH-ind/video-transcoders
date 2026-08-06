@@ -1,4 +1,4 @@
-name: Build Wheels via Local Custom Docker
+name: Build Wheels Directly
 
 on:
   push:
@@ -30,16 +30,17 @@ jobs:
           EOF
           docker build -f Dockerfile.manylinux -t custom-manylinux:latest .
 
-      - name: Install cibuildwheel
-        run: pip install --upgrade cibuildwheel
-
-      - name: Build wheels
-        env:
-          CIBW_MANYLINUX_X86_64_IMAGE: "custom-manylinux:latest"
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-          CIBW_SKIP: "pp* *-musllinux_* i686"
-          CIBW_REPAIR_COMMAND: "cp {wheel} {dest_dir}"
-        run: cibuildwheel --output-dir wheelhouse
+      - name: Build wheels via direct container script
+        run: |
+          mkdir -p wheelhouse
+          docker run --rm -v ${{ github.workspace }}:/project custom-manylinux:latest bash -c "
+            for py in cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
+              PIP_BIN=/opt/python/\$py/bin/pip
+              echo '=== Building wheel for \$py ==='
+              \$PIP_BIN install --upgrade pip
+              \$PIP_BIN wheel /project --wheel-dir=/project/wheelhouse --no-deps
+            done
+          "
 
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
