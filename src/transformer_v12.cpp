@@ -23,9 +23,9 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/error.h>
+#include <libavutil/channel_layout.h>
 }
 
-// --- PRODUCTION LOGGER ---
 enum class LogLevel { INFO, WARNING, ERROR, SUCCESS };
 
 class Logger {
@@ -59,13 +59,6 @@ public:
 };
 
 std::mutex Logger::log_mutex; 
-// -------------------------
-
-std::string get_av_error(int errnum) {
-    char buf[AV_ERROR_MAX_STRING_SIZE] = {0};
-    av_make_error_string(buf, AV_ERROR_MAX_STRING_SIZE, errnum);
-    return std::string(buf);
-}
 
 struct FFmpegDeleter {
     void operator()(AVFormatContext* ctx) const {
@@ -114,7 +107,6 @@ bool process_encoder(AVCodecContext* enc_ctx, AVFormatContext* out_ctx, AVStream
     return true;
 }
 
-// Added keyinfo parameter here
 void create_rendition(std::string input_file, std::string output_file, int width, int height, int bitrate, std::string keyinfo) {
     AVFormatContext* raw_fmt_ctx = nullptr;
     if (avformat_open_input(&raw_fmt_ctx, input_file.c_str(), nullptr, nullptr) < 0) return;
@@ -122,10 +114,10 @@ void create_rendition(std::string input_file, std::string output_file, int width
 
     if (avformat_find_stream_info(in_ctx.get(), nullptr) < 0) return;
 
-    const AVCodec* v_dec = nullptr;
-    const AVCodec* a_dec = nullptr;
-    int v_idx = av_find_best_stream(in_ctx.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &v_dec, 0);
-    int a_idx = av_find_best_stream(in_ctx.get(), AVMEDIA_TYPE_AUDIO, -1, -1, &a_dec, 0);
+    AVCodec* v_dec = nullptr;
+    AVCodec* a_dec = nullptr;
+    const int v_idx = av_find_best_stream(in_ctx.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &v_dec, 0);
+    const int a_idx = av_find_best_stream(in_ctx.get(), AVMEDIA_TYPE_AUDIO, -1, -1, &a_dec, 0);
 
     if (v_idx < 0 || a_idx < 0) return;
 
@@ -160,7 +152,8 @@ void create_rendition(std::string input_file, std::string output_file, int width
 
     CodecContextPtr a_enc_ctx(avcodec_alloc_context3(a_enc));
     a_enc_ctx->sample_rate = 44100;
-    av_channel_layout_default(&a_enc_ctx->ch_layout, 2);
+    a_enc_ctx->channel_layout = AV_CH_LAYOUT_STEREO;
+    a_enc_ctx->channels = 2;
     a_enc_ctx->sample_fmt = AV_SAMPLE_FMT_FLTP;
     a_enc_ctx->bit_rate = 128000;
     a_enc_ctx->time_base = AVRational{1, a_enc_ctx->sample_rate};
@@ -185,8 +178,6 @@ void create_rendition(std::string input_file, std::string output_file, int width
     av_opt_set(out_ctx->priv_data, "hls_time", "6", 0);
     av_opt_set(out_ctx->priv_data, "hls_segment_filename", segment_filename.c_str(), 0);
     av_opt_set(out_ctx->priv_data, "hls_list_size", "0", 0);
-    
-    // Dynamic encryption key parameter applied here
     av_opt_set(out_ctx->priv_data, "hls_key_info_file", keyinfo.c_str(), 0);
 
     if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) {
@@ -207,7 +198,7 @@ void create_rendition(std::string input_file, std::string output_file, int width
     AVFilterContext* buffersink_ctx = nullptr;
 
     char ch_layout_str[64] = {0};
-    av_channel_layout_describe(&a_dec_ctx->ch_layout, ch_layout_str, sizeof(ch_layout_str));
+    av_get_channel_layout_string(ch_layout_str, sizeof(ch_layout_str), a_dec_ctx->channels, a_dec_ctx->channel_layout);
     if (ch_layout_str[0] == '\0') snprintf(ch_layout_str, sizeof(ch_layout_str), "stereo");
 
     char args[512];
@@ -235,7 +226,7 @@ void create_rendition(std::string input_file, std::string output_file, int width
     avfilter_inout_free(&inputs);
     avfilter_inout_free(&outputs);
 
-    AudioFifoPtr fifo(av_audio_fifo_alloc(a_enc_ctx->sample_fmt, a_enc_ctx->ch_layout.nb_channels, 1));
+    AudioFifoPtr fifo(av_audio_fifo_alloc(a_enc_ctx->sample_fmt, a_enc_ctx->channels, 1));
     PacketPtr in_pkt(av_packet_alloc());
     PacketPtr out_pkt(av_packet_alloc());
     FramePtr frame(av_frame_alloc());
@@ -275,7 +266,8 @@ void create_rendition(std::string input_file, std::string output_file, int width
                         while (av_audio_fifo_size(fifo.get()) >= a_enc_ctx->frame_size) {
                             FramePtr a_out_frame(av_frame_alloc());
                             a_out_frame->nb_samples = a_enc_ctx->frame_size;
-                            av_channel_layout_copy(&a_out_frame->ch_layout, &a_enc_ctx->ch_layout);
+                            a_out_frame->channel_layout = a_enc_ctx->channel_layout;
+                            a_out_frame->channels = a_enc_ctx->channels;
                             a_out_frame->format = a_enc_ctx->sample_fmt;
                             a_out_frame->sample_rate = a_enc_ctx->sample_rate;
                             av_frame_get_buffer(a_out_frame.get(), 0);
@@ -335,7 +327,8 @@ void create_rendition(std::string input_file, std::string output_file, int width
         int out_samples = FFMIN(av_audio_fifo_size(fifo.get()), a_enc_ctx->frame_size);
         FramePtr a_out_frame(av_frame_alloc());
         a_out_frame->nb_samples = out_samples;
-        av_channel_layout_copy(&a_out_frame->ch_layout, &a_enc_ctx->ch_layout);
+        a_out_frame->channel_layout = a_enc_ctx->channel_layout;
+        a_out_frame->channels = a_enc_ctx->channels;
         a_out_frame->format = a_enc_ctx->sample_fmt;
         a_out_frame->sample_rate = a_enc_ctx->sample_rate;
         av_frame_get_buffer(a_out_frame.get(), 0);
@@ -348,10 +341,8 @@ void create_rendition(std::string input_file, std::string output_file, int width
     process_encoder(a_enc_ctx.get(), out_ctx.get(), a_out_stream, nullptr, out_pkt.get());
 
     av_write_trailer(out_ctx.get());
-    Logger::log(LogLevel::SUCCESS, "Encrypted variant created: " + output_file);
 }
 
-// Struct to hold playlist metadata
 struct PlaylistEntry {
     std::string name;
     int width;
@@ -370,24 +361,16 @@ void generate_master_playlist(const std::string& filename, const std::vector<Pla
     }
     
     master.close();
-    Logger::log(LogLevel::SUCCESS, "Encrypted Master playlist generated: " + filename);
 }
 
-// --- THE PURE C++ API FUNCTION (Includes Key Parameter) ---
 void hls_encoder(std::string input, std::string output, std::vector<std::string> resolution, std::vector<int> bitrate, std::string keyinfo) {
-    Logger::log(LogLevel::INFO, "Analyzing video file: " + input + "...");
-
     AVFormatContext* fmt_ctx = nullptr;
-    if (avformat_open_input(&fmt_ctx, input.c_str(), nullptr, nullptr) < 0) {
-        Logger::log(LogLevel::ERROR, "Could not open " + input + ". Make sure the file exists.");
-        return;
-    }
+    if (avformat_open_input(&fmt_ctx, input.c_str(), nullptr, nullptr) < 0) return;
     avformat_find_stream_info(fmt_ctx, nullptr);
     
-    const AVCodec* decoder = nullptr;
+    AVCodec* decoder = nullptr;
     int v_idx = av_find_best_stream(fmt_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
     if (v_idx < 0) {
-        Logger::log(LogLevel::ERROR, "No video stream found in the file.");
         avformat_close_input(&fmt_ctx);
         return;
     }
@@ -397,9 +380,7 @@ void hls_encoder(std::string input, std::string output, std::vector<std::string>
     avformat_close_input(&fmt_ctx); 
 
     bool is_vertical = original_height > original_width;
-    Logger::log(LogLevel::INFO, "Detected video size: " + std::to_string(original_width) + "x" + std::to_string(original_height));
 
-    // Dynamic bitrate auto-padding logic
     std::map<std::string, int> default_bitrates = {
         {"1080p", 5000000}, {"720p", 2500000}, {"480p", 1000000}, {"360p", 400000}
     };
@@ -409,14 +390,13 @@ void hls_encoder(std::string input, std::string output, std::vector<std::string>
         if (default_bitrates.count(current_res)) {
             bitrate.push_back(default_bitrates[current_res]);
         } else {
-            bitrate.push_back(1000000); // Fallback if unknown
+            bitrate.push_back(1000000); 
         }
     }
 
     std::vector<std::thread> threads;
     std::vector<PlaylistEntry> entries;
 
-    // Launch threads dynamically, passing the dynamic keyinfo
     for (size_t i = 0; i < resolution.size(); ++i) {
         std::string res_name = resolution[i];
         int target_w = 0, target_h = 0;
@@ -425,28 +405,18 @@ void hls_encoder(std::string input, std::string output, std::vector<std::string>
         else if (res_name == "720p") { target_w = 1280; target_h = 720; }
         else if (res_name == "480p") { target_w = 854; target_h = 480; }
         else if (res_name == "360p") { target_w = 640; target_h = 360; }
-        else {
-            Logger::log(LogLevel::WARNING, "Unknown resolution requested: " + res_name + ". Skipping.");
-            continue;
-        }
+        else continue;
 
-        if (is_vertical) {
-            std::swap(target_w, target_h);
-        }
+        if (is_vertical) std::swap(target_w, target_h);
 
         std::string out_m3u8 = res_name + ".m3u8";
         entries.push_back({res_name, target_w, target_h, bitrate[i]});
-
-        // Pass the keyinfo string down to the thread
         threads.emplace_back(create_rendition, input, out_m3u8, target_w, target_h, bitrate[i], keyinfo);
     }
 
     for (auto& t : threads) {
-        if (t.joinable()) {
-            t.join();
-        }
+        if (t.joinable()) t.join();
     }
 
     generate_master_playlist(output, entries);
-    Logger::log(LogLevel::SUCCESS, "All secure transcoding finished flawlessly.");
 }

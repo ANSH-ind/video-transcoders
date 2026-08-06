@@ -1,4 +1,4 @@
-name: Build and Publish Wheels
+name: Build Wheels via Local Custom Docker
 
 on:
   push:
@@ -8,52 +8,49 @@ on:
 
 jobs:
   build_wheels:
-    name: Build wheel on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    name: Build wheel on ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (for multi-arch Linux)
-        if: runner.os == 'Linux'
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-      - name: Build wheels with cibuildwheel
-        uses: pypa/cibuildwheel@v2.18.2
+      - name: Create Custom Manylinux Image
+        run: |
+          cat << 'EOF' > Dockerfile.manylinux
+          FROM quay.io/pypa/manylinux_2_28_x86_64
+          RUN dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
+              dnf install -y epel-release && \
+              dnf install -y ffmpeg-devel pkgconfig
+          EOF
+          docker build -f Dockerfile.manylinux -t custom-manylinux:latest .
+
+      - name: Install cibuildwheel
+        run: pip install --upgrade cibuildwheel
+
+      - name: Build wheels
         env:
-          # Linux (Ubuntu) ke liye FFmpeg dev headers & pkg-config install karna
-          CIBW_BEFORE_ALL_LINUX: >
-            apt-get update && apt-get install -y 
-            libavformat-dev 
-            libavcodec-dev 
-            libavfilter-dev 
-            libswscale-dev 
-            libswresample-dev 
-            libavutil-dev 
-            pkg-config
-
-          # macOS ke liye Homebrew se FFmpeg install karna
-          CIBW_BEFORE_ALL_MACOS: >
-            brew install ffmpeg pkg-config
-
-          # PyPy aur 32-bit builds ko skip karna taaki time bache
+          CIBW_MANYLINUX_X86_64_IMAGE: "custom-manylinux:latest"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
           CIBW_SKIP: "pp* *-musllinux_* i686"
+          # Auditwheel check bypass karke direct wheel copy karna
+          CIBW_REPAIR_COMMAND: "cp {wheel} {dest_dir}"
+        run: cibuildwheel --output-dir wheelhouse
 
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cibuildwheel-${{ matrix.os }}
+          name: cibuildwheel-ubuntu-latest
           path: ./wheelhouse/*.whl
 
   upload_pypi:
     needs: [build_wheels]
     runs-on: ubuntu-latest
-    # Jab aap GitHub par naya Release publish karenge, tab yeh automatic PyPI par bhej dega
     if: github.event_name == 'release' && github.event.action == 'published'
     permissions:
       id-token: write

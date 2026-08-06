@@ -1,24 +1,23 @@
 [build-system]
-requires = ["scikit-build-core>=0.8.0", "pybind11>=2.10.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.10.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "video-transcoders"
 version = "10.2.12"
-description = "High-performance video transcoding library using C++ and pybind11"
+description = "High-performance C++ video transcoder and HLS encryptor extension"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 authors = [
     { name = "Ansh Raj" }
 ]
 classifiers = [
-    "Programming Language :: Python :: 3",
     "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
-    "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
 ]
 
 [tool.scikit-build]
-# Ensures the built binary extension is correctly bundled in the wheel
-wheel.install-dir = "."
+cmake.version = ">=3.15"
+wheel.packages = ["video_transcoders"]
