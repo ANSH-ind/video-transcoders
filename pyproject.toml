@@ -1,18 +1,24 @@
 [build-system]
-requires = ["scikit-build-core", "pybind11"]
+requires = ["scikit-build-core>=0.8.0", "pybind11>=2.10.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "video-transcoders"
-version = "0.1.0"
-description = "Video transcoders library using FFmpeg and pybind11"
+version = "10.2.12"
+description = "High-performance video transcoding library using C++ and pybind11"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [
-    { name = "Ansh Raj", email = "ansh0000000001@gmail.com" }
+    { name = "Ansh Raj" }
 ]
-dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+]
 
 [tool.scikit-build]
-cmake.build-type = "Release"
-
+# Ensures the built binary extension is correctly bundled in the wheel
+wheel.install-dir = "."

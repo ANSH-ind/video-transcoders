@@ -8,7 +8,7 @@ namespace py = pybind11;
 // Tell the compiler this function exists in your other file (hls_engine.cpp)
 void hls_encoder(std::string input, std::string output, std::vector<std::string> resolution, std::vector<int> bitrate, std::string keyinfo);
 
-PYBIND11_MODULE(transcoders, m) {
+PYBIND11_MODULE(video_transcoders, m) {
     m.doc() = "HLS Video Transcoding C++ Engine Binding that gave the real power of c++ in python"; 
 
     m.def("hls_encoder", &hls_encoder, "Transcode video to HLS with dynamic ABR",

@@ -1,34 +1,33 @@
 cmake_minimum_required(VERSION 3.15)
-project(video_transcoders LANGUAGES CXX C)
+project(video_transcoders LANGUAGES CXX)
 
+# C++ Standard configuration
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Find Python and Pybind11 dependencies
+find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11 CONFIG REQUIRED)
 
-# Android ke liye PkgConfig use karna mushkil hota hai, isliye hum OS check laga rahe hain
-if(NOT ANDROID)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET 
-        libavformat 
-        libavcodec 
-        libswscale 
-        libavfilter 
-        libavutil
-    )
-endif()
-
-pybind11_add_module(video_transcoders 
-    src/bindings.cpp 
-    src/transformer_v12.cpp
+# Find FFmpeg development packages via PkgConfig
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(AV REQUIRED IMPORTED_TARGET
+    libavformat
+    libavcodec
+    libavfilter
+    libswscale
+    libswresample
+    libavutil
 )
 
-if(NOT ANDROID)
-    target_link_libraries(video_transcoders PRIVATE PkgConfig::FFMPEG)
-else()
-    # Android ke liye pre-compiled FFmpeg libraries yahan link hongi
-    # target_link_libraries(video_transcoders PRIVATE avformat avcodec swscale avfilter avutil)
-endif()
+# Define the pybind11 shared module using your source files
+pybind11_add_module(video_transcoders_ext MODULE src/bindings.cpp src/transformer_v12.cpp)
 
-# YEH SABSE IMPORTANT LINE HAI: Iske bina wheel khali banegi
-install(TARGETS video_transcoders DESTINATION .)
+# Link FFmpeg libraries to the compiled module
+target_link_libraries(video_transcoders_ext PRIVATE
+    PkgConfig::AV
+)
+
+# Install rule for scikit-build-core to package the built binary
+install(TARGETS video_transcoders_ext DESTINATION .)
+
