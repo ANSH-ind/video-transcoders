@@ -8,8 +8,8 @@ on:
 
 jobs:
   build_wheels:
-    name: Build wheel on ubuntu-latest
-    runs-on: ubuntu-latest
+    name: Build wheel on ubuntu-22.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -45,12 +45,12 @@ jobs:
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cibuildwheel-ubuntu-latest
+          name: cibuildwheel-ubuntu-22.04
           path: ./wheelhouse/*.whl
 
   upload_pypi:
     needs: [build_wheels]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: github.event_name == 'release' && github.event.action == 'published'
     permissions:
       id-token: write
