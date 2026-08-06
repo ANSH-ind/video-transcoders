@@ -1,4 +1,4 @@
-name: Build and Publish to PyPI
+name: Ultimate Cross-Platform Build
 
 on:
   release:
@@ -6,59 +6,162 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  # ==========================================
+  # 1. LINUX BUILD (x86_64 & ARM64)
+  # ==========================================
+  build_linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
+        arch: [x86_64, aarch64] # aarch64 = ARM64
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build wheels
-        uses: pypa/cibuildwheel@v2.17.0
-
-      - name: Upload wheels as artifacts
-        uses: actions/upload-artifact@v4
+      
+      # ARM64 build ke liye QEMU emulator zaroori hai
+      - name: Set up QEMU
+        if: matrix.arch == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        
+      - name: Build Linux wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        env:
+          CIBW_ARCHS_LINUX: ${{ matrix.arch }}
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.9"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
+          CIBW_SKIP: "*-musllinux* pp*"
+          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_34_x86_64
+          CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_34_aarch64
+          CIBW_BEFORE_ALL_LINUX: >
+            dnf install -y epel-release &&
+            dnf install -y 'dnf-command(config-manager)' &&
+            dnf config-manager --set-enabled crb &&
+            dnf install -y --nogpgcheck https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-9.noarch.rpm &&
+            dnf install -y ffmpeg-devel pkgconf-pkg-config
+            
+      - uses: actions/upload-artifact@v4
         with:
-          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          name: wheels-linux-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
-  build_sdist:
-    name: Build source distribution (sdist)
+  # ==========================================
+  # 2. MACOS BUILD (Intel & ARM64)
+  # ==========================================
+  build_macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: macos-13 # Intel Mac
+          - arch: arm64
+            runner: macos-latest # Apple Silicon (M1/M2)
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build macOS wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        env:
+          CIBW_ARCHS_MACOS: ${{ matrix.arch }}
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.9"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
+          CIBW_SKIP: "*-musllinux* pp*"
+          CIBW_BEFORE_ALL_MACOS: brew install ffmpeg pkg-config
+          
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-${{ matrix.arch }}
+          path: ./wheelhouse/*.whl
+
+  # ==========================================
+  # 3. WINDOWS BUILD (x86_64)
+  # ==========================================
+  build_windows:
+    name: Windows (x86_64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Windows wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        env:
+          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.9"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
+          CIBW_SKIP: "*-musllinux* pp*"
+          CIBW_BEFORE_ALL_WINDOWS: >
+            choco install pkgconfiglite &&
+            vcpkg install ffmpeg:x64-windows
+          CIBW_ENVIRONMENT_WINDOWS: 'PKG_CONFIG_PATH="C:/vcpkg/installed/x64-windows/lib/pkgconfig"'
+          
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-x86_64
+          path: ./wheelhouse/*.whl
+
+  # ==========================================
+  # 4. ANDROID BUILD (ARM64 via NDK)
+  # ==========================================
+  build_android:
+    name: Android (ARM64)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r25c
+          
+      - name: Build Android Wheel
+        run: |
+          pip install build scikit-build-core pybind11
+          # Note: Real Android compilation requires passing NDK paths to CMake
+          export CMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake
+          export ANDROID_ABI=arm64-v8a
+          python -m build --wheel
+          
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-android-arm64
+          path: dist/*.whl
 
+  # ==========================================
+  # 5. SOURCE DIST & UPLOAD TO PYPI
+  # ==========================================
+  upload_pypi:
+    name: Upload to PyPI
+    needs: [build_linux, build_macos, build_windows] # Android is excluded here unless fully tested
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-
-      - name: Install build tool
-        run: python -m pip install build
-
+          
       - name: Build sdist
-        run: python -m build --sdist
-
-      - name: Upload sdist as artifact
-        uses: actions/upload-artifact@v4
+        run: |
+          pip install build
+          python -m build --sdist
+          
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
         with:
-          name: cibw-sdist
-          path: dist/*.tar.gz
-
-  upload_pypi:
-    needs: [build_wheels, build_sdist]
-    name: Upload to PyPI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: cibw-*
+          pattern: wheels-*
           path: dist
           merge-multiple: true
-
+          
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
