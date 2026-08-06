@@ -21,3 +21,9 @@ classifiers = [
 [tool.scikit-build]
 cmake.version = ">=3.15"
 wheel.packages = ["video_transcoders"]
+
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-*"
+skip = "pp* *-musllinux_* i686"
+manylinux-x86-64-image = "custom-manylinux:latest"
+repair-command = "cp {wheel} {dest_dir}"
