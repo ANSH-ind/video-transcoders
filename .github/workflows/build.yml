@@ -11,12 +11,6 @@ jobs:
     name: Build wheel on ubuntu-latest
     runs-on: ubuntu-latest
 
-    env:
-      CIBW_MANYLINUX_X86_64_IMAGE: "custom-manylinux:latest"
-      CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-      CIBW_SKIP: "pp* *-musllinux_* i686"
-      CIBW_REPAIR_COMMAND: "cp {wheel} {dest_dir}"
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,7 +34,11 @@ jobs:
         run: pip install --upgrade cibuildwheel
 
       - name: Build wheels
-        run: cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_MANYLINUX_X86_64_IMAGE: "custom-manylinux:latest"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
+          CIBW_SKIP: "pp* *-musllinux_* i686"
+        run: cibuildwheel --output-dir wheelhouse --repair-command "cp {wheel} {dest_dir}"
 
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
