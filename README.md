@@ -1,5 +1,8 @@
 # video-transcoders (Enterprise Video Engine)
 
+- note: this library are in development
+
+  
 A high-performance, multi-threaded C++ video transcoding engine built on top of FFmpeg. This engine converts standard video files (`.mp4`, `.mov`, etc.) into highly optimized, Adaptive Bitrate (ABR) HTTP Live Streaming (HLS) formats and also for other formats.
 
 It is designed for production backend environments, featuring real-time AES-128 encryption, broadcast-standard audio normalization, and seamless integration with Python via `pybind11`.
@@ -17,6 +20,7 @@ It is designed for production backend environments, featuring real-time AES-128 
 
 ---
 
+
 ## Prerequisites
 
 You must have the FFmpeg development libraries and a C++ compiler installed on your system.
@@ -26,11 +30,6 @@ You must have the FFmpeg development libraries and a C++ compiler installed on y
 sudo apt update
 sudo apt install g++ libavformat-dev libavcodec-dev libswscale-dev libavutil-dev libavfilter-dev libswresample-dev
 ```
-
-# Architecture
-* The project is cleanly separated into two main components:
-* hls_engine.cpp: The pure C++ core logic containing all FFmpeg memory management, multithreading, and video processing.
-* ​wrapper.cpp: The lightweight pybind11 bridge that exposes the C++ engine to Python.
 
 ##how to use
 
@@ -49,12 +48,14 @@ echo "enc.key" >> enc.keyinfo
 
 - Note: In a real production environment, the first line of enc.keyinfo should be the public URL where your web player can fetch the key
 
+
 #api uses
+
 ```python
 from vedio_transcoders import  hls_encoder
 
-#The engine will automatically pad missing bitrates using production defaults
-#and detect if the video is Vertical or Horizontal.
+#The engine will automatically pad missing bitrates using production defaults and detect if the video is Vertical or Horizontal.
+#note: before the use of the function hls_encoder you need to a 16 bytes key and pass them into the function parameters 'key = example.keyinfo'
 
 hls_encoder(
     input="user_upload.mp4",
@@ -65,4 +66,5 @@ hls_encoder(
 )
 
 print("Video successfully packaged for HLS delivery!")
+```
 
