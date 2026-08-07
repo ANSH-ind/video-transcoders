@@ -1,6 +1,6 @@
-# HLS Transformer (Enterprise Video Engine)
+# video-transcoders (Enterprise Video Engine)
 
-A high-performance, multi-threaded C++ video transcoding engine built on top of FFmpeg. This engine converts standard video files (`.mp4`, `.mov`, etc.) into highly optimized, Adaptive Bitrate (ABR) HTTP Live Streaming (HLS) formats. 
+A high-performance, multi-threaded C++ video transcoding engine built on top of FFmpeg. This engine converts standard video files (`.mp4`, `.mov`, etc.) into highly optimized, Adaptive Bitrate (ABR) HTTP Live Streaming (HLS) formats and also for other formats.
 
 It is designed for production backend environments, featuring real-time AES-128 encryption, broadcast-standard audio normalization, and seamless integration with Python via `pybind11`.
 
