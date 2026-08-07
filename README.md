@@ -2,6 +2,11 @@
 
 - note: this library are in development
 
+
+<p align="center">
+  <img src="file_00000000f874820b9210934f09d47b1f.png" alt="Logo" width="150" style="border-radius: 50%;" />
+</p>
+
   
 A high-performance, multi-threaded C++ video transcoding engine built on top of FFmpeg. This engine converts standard video files (`.mp4`, `.mov`, etc.) into highly optimized, Adaptive Bitrate (ABR) HTTP Live Streaming (HLS) formats and also for other formats.
 
