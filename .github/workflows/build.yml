@@ -1,3 +1,53 @@
+name: Build Wheels Directly
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  build_wheels:
+    name: Build wheel on ubuntu-22.04
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Create Custom Manylinux Image
+        run: |
+          cat << 'EOF' > Dockerfile.manylinux
+          FROM quay.io/pypa/manylinux_2_28_x86_64
+          RUN dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
+              dnf install -y epel-release && \
+              dnf install -y ffmpeg-devel pkgconfig
+          EOF
+          docker build -f Dockerfile.manylinux -t custom-manylinux:latest .
+
+      - name: Build wheels via direct container script
+        run: |
+          mkdir -p wheelhouse
+          docker run --rm -v ${{ github.workspace }}:/project custom-manylinux:latest bash -c "
+            for py in cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
+              PIP_BIN=/opt/python/\$py/bin/pip
+              echo '=== Building wheel for \$py ==='
+              \$PIP_BIN install --upgrade pip
+              \$PIP_BIN wheel /project --wheel-dir=/project/wheelhouse --no-deps
+            done
+          "
+
+      - name: Upload wheels as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibuildwheel-ubuntu-22.04
+          path: ./wheelhouse/*.whl
+
   upload_pypi:
     needs: [build_wheels]
     runs-on: ubuntu-22.04
