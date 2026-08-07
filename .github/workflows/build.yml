@@ -24,9 +24,9 @@ jobs:
         run: |
           cat << 'EOF' > Dockerfile.manylinux
           FROM quay.io/pypa/manylinux_2_28_x86_64
-          RUN dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
-              dnf install -y epel-release && \
-              dnf install -y ffmpeg-devel pkgconfig
+          RUN dnf install -y --setopt=retries=10 --setopt=timeout=60 https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
+              dnf install -y --setopt=retries=10 --setopt=timeout=60 epel-release && \
+              dnf install -y --setopt=retries=10 --setopt=timeout=60 ffmpeg-devel pkgconfig
           EOF
           docker build -f Dockerfile.manylinux -t custom-manylinux:latest .
 
