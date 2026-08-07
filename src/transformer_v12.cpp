@@ -114,8 +114,8 @@ void create_rendition(std::string input_file, std::string output_file, int width
 
     if (avformat_find_stream_info(in_ctx.get(), nullptr) < 0) return;
 
-    AVCodec* v_dec = nullptr;
-    AVCodec* a_dec = nullptr;
+    const AVCodec* v_dec = nullptr;
+    const AVCodec* a_dec = nullptr;
     const int v_idx = av_find_best_stream(in_ctx.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &v_dec, 0);
     const int a_idx = av_find_best_stream(in_ctx.get(), AVMEDIA_TYPE_AUDIO, -1, -1, &a_dec, 0);
 
@@ -368,7 +368,7 @@ void hls_encoder(std::string input, std::string output, std::vector<std::string>
     if (avformat_open_input(&fmt_ctx, input.c_str(), nullptr, nullptr) < 0) return;
     avformat_find_stream_info(fmt_ctx, nullptr);
     
-    AVCodec* decoder = nullptr;
+    const AVCodec* decoder = nullptr;
     int v_idx = av_find_best_stream(fmt_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
     if (v_idx < 0) {
         avformat_close_input(&fmt_ctx);
