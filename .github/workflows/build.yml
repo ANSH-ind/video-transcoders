@@ -30,15 +30,21 @@ jobs:
           EOF
           docker build -f Dockerfile.manylinux -t custom-manylinux:latest .
 
-      - name: Build wheels via direct container script
+      - name: Build and Repair wheels via manylinux container
         run: |
-          mkdir -p wheelhouse
+          mkdir -p wheelhouse final_wheelhouse
           docker run --rm -v ${{ github.workspace }}:/project custom-manylinux:latest bash -c "
+            mkdir -p /project/wheelhouse /project/final_wheelhouse
             for py in cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
               PIP_BIN=/opt/python/\$py/bin/pip
               echo '=== Building wheel for \$py ==='
               \$PIP_BIN install --upgrade pip
               \$PIP_BIN wheel /project --wheel-dir=/project/wheelhouse --no-deps
+            done
+            
+            echo '=== Repairing wheels with auditwheel ==='
+            for whl in /project/wheelhouse/*.whl; do
+              auditwheel repair \$whl -w /project/final_wheelhouse
             done
           "
 
@@ -46,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cibuildwheel-ubuntu-22.04
-          path: ./wheelhouse/*.whl
+          path: ./final_wheelhouse/*.whl
 
   upload_pypi:
     needs: [build_wheels]
