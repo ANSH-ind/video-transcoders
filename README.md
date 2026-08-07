@@ -53,6 +53,18 @@ echo "enc.key" >> enc.keyinfo
 
 - Note: In a real production environment, the first line of enc.keyinfo should be the public URL where your web player can fetch the key
 
+<h3>installation</h3>
+
+<p1>lunex 64 but </p1>
+
+```bash
+pip install video-transcoders==10.2.14
+```
+<p1>windows</p1>
+
+```bash
+pip install video-transcoders
+```
 
 #api uses
 
